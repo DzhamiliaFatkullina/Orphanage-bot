@@ -2,7 +2,7 @@ from telegram import Update, ForceReply
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ConversationHandler, ContextTypes
 
 # Define states for conversation
-NAME, AGE, REGION, ORPHANAGE, ALUMNI = range(5)
+NAME, AGE, REGION, ORPHANAGE, ALUMNI, PROBLEM = range(6)
 
 # Start command handler
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -38,6 +38,12 @@ async def orphanage(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 # Collect alumni status and ask for problem
 async def alumni(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['alumni'] = update.message.text.lower() in ['yes', 'y']
+    await update.message.reply_text('What problem do you want to address?')
+    return PROBLEM
+
+# Collect problem and finish the conversation
+async def problem(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data['problem'] = update.message.text
     user_data = context.user_data
     await update.message.reply_text(
         f'Thank you for registering!\n'
@@ -45,7 +51,8 @@ async def alumni(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         f'Age: {user_data["age"]}\n'
         f'Region: {user_data["region"]}\n'
         f'Orphanage: {user_data["orphanage"]}\n'
-        f'Alumni: {"Yes" if user_data["alumni"] else "No"}'
+        f'Alumni: {"Yes" if user_data["alumni"] else "No"}\n'
+        f'Problem: {user_data["problem"]}'
     )
     return ConversationHandler.END
 
@@ -57,10 +64,9 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 def main() -> None:
-    # Create the Application and pass it your bot's token
+    # Create the Application and pass it your bot's token.
     application = Application.builder().token("7327293440:AAGmRIQU2mJZ2hP1YuljOHY3FhGnOUmZyPQ").build()
 
- # Registation
     # Set up conversation handler with the states
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
@@ -70,11 +76,10 @@ def main() -> None:
             REGION: [MessageHandler(filters.TEXT & ~filters.COMMAND, region)],
             ORPHANAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, orphanage)],
             ALUMNI: [MessageHandler(filters.TEXT & ~filters.COMMAND, alumni)],
+            PROBLEM: [MessageHandler(filters.TEXT & ~filters.COMMAND, problem)],
         },
         fallbacks=[CommandHandler('cancel', cancel)],
     )
-    
- 
 
     # Add conversation handler to dispatcher
     application.add_handler(conv_handler)
@@ -82,5 +87,5 @@ def main() -> None:
     # Start the Bot
     application.run_polling()
 
-if name == '__main__':
+if __name__ == '__main__':
     main()
