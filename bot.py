@@ -4,6 +4,7 @@ import uuid  # Import the uuid library
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackQueryHandler, CallbackContext
 
+#this is for /send_request part of code that im stuck on, this allows to send button sheet
 from warnings import filterwarnings
 from telegram.warnings import PTBUserWarning
 
@@ -180,6 +181,77 @@ async def verify_and_save_problem(update, context):
         await context.bot.send_message(chat_id=update.effective_chat.id, text="I didn't undersrand you :(. Please verify the problem again.(y/n)")
 
 
+REPORT_PROBLEM = range(1)
+
+# Function to handle the /report_error command
+async def report_error(update: Update, context: CallbackContext):
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="What is the problem?")
+    return REPORT_PROBLEM
+
+# Function to handle the user's response
+async def handle_problem(update: Update, context: CallbackContext):
+    problem = update.message.text
+    # Process the problem or save it to a database
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="Thank you for reporting the problem.")
+    return ConversationHandler.END
+
+def main() -> None:
+    # Create the Application and pass it your bot's token.
+    application = Application.builder().token("7327293440:AAEwM4CqRoz-JXsqp-lE864M45B6OaOHZ7M").build()
+
+    # Set up conversation handler with the states
+    conv_handler_registration = ConversationHandler(
+        entry_points=[CommandHandler('start', start), CommandHandler('set_profile', start)],
+        states={
+            NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, name)],
+            AGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, age)],
+            REGION: [MessageHandler(filters.TEXT & ~filters.COMMAND, region)],
+            ORPHANAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, orphanage)],
+            ALUMNI: [MessageHandler(filters.TEXT & ~filters.COMMAND, alumni)],
+        },
+        fallbacks=[CommandHandler('cancel', cancel)],
+    )
+    # Add conversation handler to dispatcher
+    application.add_handler(conv_handler_registration)
+
+    # Create the help command handler
+    help_handler = CommandHandler('help', help_command)
+
+    # Add the help command handler to the application
+    application.add_handler(help_handler)
+
+    #send request conversation handler
+    conv_handler_request = ConversationHandler(
+    entry_points=[CommandHandler('send_request', send_request)],
+    states={
+        REQUEST_TYPE: [CallbackQueryHandler(button_pressed)],
+        SUBMIT_PROBLEM: [MessageHandler(filters.TEXT & ~filters.COMMAND, submit_problem)],
+        VERIFY_PROBLEM: [MessageHandler(filters.Regex('^yes$|^no$'), verify_and_save_problem)]
+    },
+    fallbacks=[CommandHandler('cancel', cancel)] 
+    )
+
+    application.add_handler(conv_handler_request)
+
+    conv_report_error = ConversationHandler(
+    entry_points=[CommandHandler('report_error', report_error)],
+    states={
+        REPORT_PROBLEM: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_problem)]
+    },
+    fallbacks=[CommandHandler('cancel', cancel)]  # Implement cancel logic if needed
+)
+
+    application.add_handler(conv_report_error)
+    
+    # Start the Bot
+    application.run_polling()
+
+if __name__ == '__main__':
+    main()
+
+
+#DRAFT:
+
 # #second time I tried, this time don't care if I understand what is going on
 # # Placeholder for the database simulation
 # problems_db = {}
@@ -249,72 +321,3 @@ async def verify_and_save_problem(update, context):
 #     update.message.reply_text("Problem has been saved.")
     
 #     return ConversationHandler.END
-
-
-REPORT_PROBLEM = range(1)
-
-# Function to handle the /report_error command
-async def report_error(update: Update, context: CallbackContext):
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="What is the problem?")
-    return REPORT_PROBLEM
-
-# Function to handle the user's response
-async def handle_problem(update: Update, context: CallbackContext):
-    problem = update.message.text
-    # Process the problem or save it to a database
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="Thank you for reporting the problem.")
-    return ConversationHandler.END
-
-def main() -> None:
-    # Create the Application and pass it your bot's token.
-    application = Application.builder().token("7327293440:AAEwM4CqRoz-JXsqp-lE864M45B6OaOHZ7M").build()
-
-    # Set up conversation handler with the states
-    conv_handler_registration = ConversationHandler(
-        entry_points=[CommandHandler('start', start), CommandHandler('set_profile', start)],
-        states={
-            NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, name)],
-            AGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, age)],
-            REGION: [MessageHandler(filters.TEXT & ~filters.COMMAND, region)],
-            ORPHANAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, orphanage)],
-            ALUMNI: [MessageHandler(filters.TEXT & ~filters.COMMAND, alumni)],
-        },
-        fallbacks=[CommandHandler('cancel', cancel)],
-    )
-    # Add conversation handler to dispatcher
-    application.add_handler(conv_handler_registration)
-
-    # Create the help command handler
-    help_handler = CommandHandler('help', help_command)
-
-    # Add the help command handler to the application
-    application.add_handler(help_handler)
-
-    #send request conversation handler
-    conv_handler_request = ConversationHandler(
-    entry_points=[CommandHandler('send_request', send_request)],
-    states={
-        REQUEST_TYPE: [CallbackQueryHandler(button_pressed)],
-        SUBMIT_PROBLEM: [MessageHandler(filters.TEXT & ~filters.COMMAND, submit_problem)],
-        VERIFY_PROBLEM: [MessageHandler(filters.Regex('^yes$|^no$'), verify_and_save_problem)]
-    },
-    fallbacks=[CommandHandler('cancel', cancel)] 
-    )
-
-    application.add_handler(conv_handler_request)
-
-    conv_report_error = ConversationHandler(
-    entry_points=[CommandHandler('report_error', report_error)],
-    states={
-        REPORT_PROBLEM: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_problem)]
-    },
-    fallbacks=[CommandHandler('cancel', cancel)]  # Implement cancel logic if needed
-)
-
-    application.add_handler(conv_report_error)
-    
-    # Start the Bot
-    application.run_polling()
-
-if __name__ == '__main__':
-    main()
