@@ -1,6 +1,9 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from telegram import Update, Bot
+from telegram.ext import CallbackQueryHandler, CallbackContext
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ConversationHandler, ContextTypes
 import asyncio
 
@@ -36,7 +39,9 @@ with app.app_context():
 NAME, AGE, REGION, ORPHANAGE, ALUMNI, PROBLEM = range(6)
 
 # Define the bot token and the target chat ID
+
 BOT_TOKEN = "7305786297:AAFzC93nebvp7obQOl3NFOx634AnFOHzwyo"
+#admin id 
 TARGET_CHAT_ID = "TARGET_CHAT_ID"
 
 # Initialize the bot
@@ -75,6 +80,144 @@ def get_event_data():
             event_messages.append(message)
         
         return "\n".join(event_messages)
+#-------------------not working good ----------------------------
+
+#this code sends buttons but doesn't respond to it. Should be a quick fix, maybe use AI. Im stuck.
+
+# Define states for conversation
+REQUEST_TYPE, SUBMIT_PROBLEM, VERIFY_PROBLEM = range(3)
+
+# Function to build the keyboard for request types
+def build_request_buttons():
+    keyboard = [
+        [InlineKeyboardButton("Request Type 1", callback_data='type1')],
+        [InlineKeyboardButton("Request Type 2", callback_data='type2')],
+        [InlineKeyboardButton("Request Type 3", callback_data='type3')],
+        [InlineKeyboardButton("Request Type 4", callback_data='type4')]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+# Handler to start the conversation and send the request type options
+async def send_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="Choose type of request", reply_markup=build_request_buttons())
+    return REQUEST_TYPE
+
+# Handler to process the button press and ask for the problem description
+async def button_pressed(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    context.user_data['request_type'] = query.data  # Store the selected request type
+    await query.edit_message_text(text="Please write your problem.")
+    return SUBMIT_PROBLEM
+
+# Handler to capture the problem description from the user
+async def submit_problem(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    problem = update.message.text
+    context.user_data['problem'] = problem
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=f"Type of Request: {context.user_data['request_type']}\nProblem: {problem}\nIs this correct? (yes/no)")
+    return VERIFY_PROBLEM
+
+# Handler to verify and save the problem description
+async def verify_and_save_problem(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    verified = update.message.text.lower() == 'yes'
+    if verified:
+        user_id = update.message.from_user.id  # Get user ID from the message
+        if user_id:
+            user_data = context.user_data
+    
+                        # Perform the database operation within the Flask app context
+            with app.app_context():
+                user_id = update.message.from_user.id
+                existing_event = Event.query.filter_by(user_id=user_id).first()
+                if existing_event:
+                    print("User ID exists in the database.")
+                else:
+                    print("User ID does not exist in the database.")
+                try:
+                    user =await bot.get_chat_member(chat_id=user_id, user_id=user_id)
+                    if user.user.username:
+                        print( user.user.username)
+                        await send_message_to_chat(user.user.username)
+
+                    else:
+                        print( "User doesn't have a username.")
+                except Exception as e:
+                    print( f"Error: {e}")
+
+                new_event = Event(
+                    user_id=existing_event.user_id,
+                    name=existing_event.name,
+                    age=existing_event.age,
+                    region=existing_event.region,
+                    orphanage=existing_event.orphanage,
+                    alumni=existing_event.alumni,
+                    problem=user_data['problem']
+                )
+                db.session.add(new_event)
+                db.session.commit()
+
+            # await update.message.reply_text(
+            #     f'Thank you for registering!\n'
+            #     f'Name: {user_data["name"]}\n'
+            #     f'Age: {user_data["age"]}\n'
+            #     f'Region: {user_data["region"]}\n'
+            #     f'Orphanage: {user_data["orphanage"]}\n'
+            #     f'Alumni: {"Yes" if user_data["alumni"] else "No"}\n'
+            #     f'Problem: {user_data["problem"]}'
+            # )
+
+            # Retrieve and send the event data
+            #event_data_message = get_event_data()
+            #await send_message_to_chat("hello from the app ")
+            # Save problem to the database (function to be implemented)
+            # save_problem_to_database(user_id, context.user_data['problem'])  # TODO: Implement this function
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="Your problem has been successfully saved.")
+        else:
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="User ID not found. Please try again.")
+    else:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="I didn't understand you :(. Please verify the problem again. (yes/no)")
+    return ConversationHandler.END  # End the conversation
+
+# Handler to cancel the request
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.message.reply_text('Request cancelled.')
+    return ConversationHandler.END
+
+
+
+#--------------------not working good ----------------------------
+
+
+async def help_command(update, context):
+    """Send a message when the command /help is issued."""
+    await update.message.reply_text('''
+Hello I am your friendly bot. Here's how you can use me:
+/start - Start chatting with the bot, set up profile
+/set_profile - Set up profile, usually chage info, but not ID
+/send_request - choose type of request and share problem
+/report_error - let developers know what goes wrong
+/cancel - at any point you can cancel whatever you are doing
+and start over with a new command                                   
+/help - Get help on how to use me.
+''')
+    
+
+
+REPORT_PROBLEM = range(1)
+
+# Function to handle the /report_error command
+async def report_error(update: Update, context: CallbackContext):
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="What is the problem?")
+    return REPORT_PROBLEM
+
+# Function to handle the user's response
+async def handle_problem(update: Update, context: CallbackContext):
+    problem = update.message.text
+    # Process the problem or save it to a database
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="Thank you for reporting the problem.")
+    return ConversationHandler.END
+
+
 
 # Function to send a message to the target chat
 async def send_message_to_chat(message: str):
@@ -176,7 +319,7 @@ async def problem(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 # Command to cancel the conversation
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.message.reply_text('Registration cancelled. You can start over with /start.')
+    await update.message.reply_text('Action cancelled. You can start over by sending the command once again or use /help to se menu')
     return ConversationHandler.END
 
 def main():
@@ -197,8 +340,47 @@ def main():
         fallbacks=[CommandHandler('cancel', cancel)],
     )
 
+
     # Add conversation handler to dispatcher
     application.add_handler(conv_handler)
+    help_handler = CommandHandler('help', help_command)
+
+    # Add the help command handler to the application
+    application.add_handler(help_handler)
+
+
+
+
+
+    conv_report_error = ConversationHandler(
+    entry_points=[CommandHandler('report_error', report_error)],
+    states={
+        REPORT_PROBLEM: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_problem)]
+    },
+    fallbacks=[CommandHandler('cancel', cancel)]  # Implement cancel logic if needed
+)
+
+    application.add_handler(conv_report_error)
+
+#------------------------------------------------------
+
+    # Define the conversation handler with the states and fallbacks
+    conv_handler_request = ConversationHandler(
+        entry_points=[CommandHandler('send_request', send_request)],
+        states={
+            REQUEST_TYPE: [CallbackQueryHandler(button_pressed)],
+            SUBMIT_PROBLEM: [MessageHandler(filters.TEXT & ~filters.COMMAND, submit_problem)],
+            VERIFY_PROBLEM: [MessageHandler(filters.Regex('^(yes|no)$'), verify_and_save_problem)]
+        },
+        fallbacks=[CommandHandler('cancel', cancel)],
+        per_user=False  # Track the conversation per user instead of per message
+        #per_message=True
+    )
+
+    application.add_handler(conv_handler_request)
+
+    
+#---------------------------------------------------------
 
     # Start the Telegram bot in a separate thread
     loop = asyncio.get_event_loop()
@@ -210,201 +392,3 @@ def main():
 if __name__ == '__main__':
     main()
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#-------------------------------------------------------------
-# from flask import Flask
-# from database import db
-# from models import Event, create_event, get_event, update_event, delete_event, get_all_events
-# from process import pars_data, encdode
-# from telegram import Update, ForceReply
-
-# from telegram.ext import Application, CommandHandler, MessageHandler, filters, ConversationHandler, ContextTypes
-# from models import register_route
-# # Define states for conversation
-# # Define states for conversation
-# NAME, AGE, REGION, ORPHANAGE, ALUMNI, PROBLEM = range(6)
-# app = Flask(__name__)
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///events.db'
-# #app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-# db.init_app(app)
-
-
-# # Start command handler
-# async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-#     await update.message.reply_text(
-#         'Welcome! Let\'s register you. What\'s your name?'
-#     )
-#     return NAME
-
-# # Collect name and ask for age
-# async def name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-#     context.user_data['name'] = update.message.text
-#     await update.message.reply_text('How old are you?')
-#     return AGE
-
-# # Collect age and ask for region
-# async def age(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-#     context.user_data['age'] = update.message.text
-#     await update.message.reply_text('Which region are you from?')
-#     return REGION
-
-# # Collect region and ask for orphanage
-# async def region(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-#     context.user_data['region'] = update.message.text
-#     await update.message.reply_text('What is the name of your orphanage?')
-#     return ORPHANAGE
-
-# # Collect orphanage and ask if they are alumni
-# async def orphanage(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-#     context.user_data['orphanage'] = update.message.text
-#     await update.message.reply_text('Are you an alumni? (yes/no)')
-#     return ALUMNI
-
-# # Collect alumni status and ask for problem
-# async def alumni(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-#     context.user_data['alumni'] = update.message.text.lower() in ['yes', 'y']
-#     await update.message.reply_text('What problem do you want to address?')
-#     return PROBLEM
-
-# # Collect problem and finish the conversation
-# async def problem(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-#     context.user_data['problem'] = update.message.text
-#     user_data = context.user_data
-#     await update.message.reply_text(
-#         f'Thank you for registering!\n'
-#         f'Name: {user_data["name"]}\n'
-#         f'Age: {user_data["age"]}\n'
-#         f'Region: {user_data["region"]}\n'
-#         f'Orphanage: {user_data["orphanage"]}\n'
-#         f'Alumni: {"Yes" if user_data["alumni"] else "No"}\n'
-#         f'Problem: {user_data["problem"]}'
-        
-#     )
-#     register_route(NAME, AGE, REGION, ORPHANAGE, ALUMNI, PROBLEM)
-#     return ConversationHandler.END
-
-# # Command to cancel the conversation
-# async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-#     await update.message.reply_text(
-#         'Registration cancelled. You can start over with /start.'
-#     )
-#     return ConversationHandler.END
-
-# def main() -> None:
-#     # Create the Application and pass it your bot's token.
-#     application = Application.builder().token("7305786297:AAFzC93nebvp7obQOl3NFOx634AnFOHzwyo").build()
-
-#     # Set up conversation handler with the states
-#     conv_handler = ConversationHandler(
-#         entry_points=[CommandHandler('start', start)],
-#         states={
-#             NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, name)],
-#             AGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, age)],
-#             REGION: [MessageHandler(filters.TEXT & ~filters.COMMAND, region)],
-#             ORPHANAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, orphanage)],
-#             ALUMNI: [MessageHandler(filters.TEXT & ~filters.COMMAND, alumni)],
-#             PROBLEM: [MessageHandler(filters.TEXT & ~filters.COMMAND, problem)],
-#         },
-#         fallbacks=[CommandHandler('cancel', cancel)],
-#     )
-
-#     # Add conversation handler to dispatcher
-#     application.add_handler(conv_handler)
-
-#     # Start the Bot
-#     application.run_polling()
-#     app.run()
-#     #app.app_context()
-
-
-# def perform_database_operations():
-#     with app.app_context():
-#         # Now you can perform database operations within this context
-#         # For example, creating a new event
-#         event = Event(name='John', age=25, region='XYZ', orphanage='ABC', alumni='Yes', problem='None')
-#         db.session.add(event)
-#         db.session.commit()
-
-# if __name__ == '__main__':
-#     #perform_database_operations()
-#     main()
-
-
-#----------------------------------------------
-
-
-# from flask import Flask, jsonify, request
-# #from flask_cors import CORS  # Import CORS
-
-# from database import db
-# from models import Event, create_event, get_event, update_event, delete_event, get_all_events
-# from process import pars_data, encdode
-
-# app = Flask(__name__)
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///events.db'
-# app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-# db.init_app(app)
-# #CORS(app)  # Add this line to enable CORS for your Flask app
-# @app.route('/register', methods=['POST'])
-# def register_route():
-#     data = request.json
-#     data = pars_data(data)
-    
-#     event = create_event(**data)
-#     return jsonify(event), 201
-
-
-# @app.route('/create', methods=['POST'])
-# def create_event_route():
-#     data = request.json
-#     data = pars_data(data)
-    
-#     event = create_event(**data)
-#     return jsonify(event), 201
-
-# @app.route('/get/<int:event_id>', methods=['GET'])
-# def get_event_route(event_id):
-#     event = get_event(event_id)
-#     if event:
-#         event_dict = encdode(event)
-#         return jsonify(event_dict)
-#     else:
-#         return jsonify({'message': 'Event not found'}), 404
-
-# @app.route('/update/<int:event_id>', methods=['PUT'])
-# def update_event_route(event_id):
-#     data = request.json
-#     data = pars_data(data)
-#     update_event(event_id, **data)
-#     return '', 204
-
-# @app.route('/delete/<int:event_id>', methods=['DELETE'])  # Fixed the route path here
-# def delete_event_route(event_id):
-#     delete_event(event_id)
-#     return '', 204
-
-# @app.route('/get', methods=['GET'])
-# def get_all_events_route():
-#     events = get_all_events()
-#     return jsonify(events)
-
-# if __name__ == '__main__':
-#     app.run(debug=True)
