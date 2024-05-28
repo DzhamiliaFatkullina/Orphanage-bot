@@ -10,7 +10,8 @@ my_chat_id = None
 # Define your models
 class Event(db.Model):
     __tablename__ = 'events'
-    user_id = db.Column(db.Integer, primary_key=True)  # Using user_id as the primary key
+    id = db.Column(db.Integer, primary_key=True)  # Using user_id as the primary key
+    user_id = db.Column(db.Integer)
     name = db.Column(db.String)
     age = db.Column(db.Integer)
     region = db.Column(db.String)
@@ -40,6 +41,17 @@ TARGET_CHAT_ID = "TARGET_CHAT_ID"
 
 # Initialize the bot
 bot = Bot(token=BOT_TOKEN)
+
+
+# def user_id_exists(user_id):
+#     # Query the Event table for the specified user_id
+#     existing_event = Event.query.filter_by(user_id=user_id).first()
+    
+#     # Check if an event with the specified user_id exists
+#     if existing_event:
+#         return True
+#     else:
+#         return False
 
 # Function to retrieve and format event data
 def get_event_data():
@@ -112,11 +124,30 @@ async def alumni(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def problem(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['problem'] = update.message.text
     user_data = context.user_data
+    
+    
 
     # Perform the database operation within the Flask app context
     with app.app_context():
+        user_id = update.message.from_user.id
+        existing_event = Event.query.filter_by(user_id=user_id).first()
+        if existing_event:
+            print("User ID exists in the database.")
+        else:
+            print("User ID does not exist in the database.")
+        try:
+            user =await bot.get_chat_member(chat_id=user_id, user_id=user_id)
+            if user.user.username:
+                print( user.user.username)
+                await send_message_to_chat(user.user.username)
+
+            else:
+                print( "User doesn't have a username.")
+        except Exception as e:
+            print( f"Error: {e}")
+
         new_event = Event(
-            #user_id=my_chat_id,
+            user_id=update.message.from_user.id,
             name=user_data['name'],
             age=user_data['age'],
             region=user_data['region'],
@@ -178,6 +209,7 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
 
 
