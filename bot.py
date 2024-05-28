@@ -184,7 +184,7 @@ async def verify_and_save_problem(update, context):
 REPORT_PROBLEM = range(1)
 
 # Function to handle the /report_error command
-async def report_error(update: Update, context: CallbackContext):
+async def report_error(update: Update, context: CallbackContext):N
     await context.bot.send_message(chat_id=update.effective_chat.id, text="What is the problem?")
     return REPORT_PROBLEM
 
@@ -197,7 +197,7 @@ async def handle_problem(update: Update, context: CallbackContext):
 
 def main() -> None:
     # Create the Application and pass it your bot's token.
-    application = Application.builder().token("7327293440:AAEwM4CqRoz-JXsqp-lE864M45B6OaOHZ7M").build()
+    application = Application.builder().token("TOKEN").build()
 
     # Set up conversation handler with the states
     conv_handler_registration = ConversationHandler(
