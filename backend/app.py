@@ -90,16 +90,16 @@ REQUEST_TYPE, SUBMIT_PROBLEM, VERIFY_PROBLEM = range(3)
 # Function to build the keyboard for request types
 def build_request_buttons():
     keyboard = [
-        [InlineKeyboardButton("Request Type 1", callback_data='type1')],
-        [InlineKeyboardButton("Request Type 2", callback_data='type2')],
-        [InlineKeyboardButton("Request Type 3", callback_data='type3')],
-        [InlineKeyboardButton("Request Type 4", callback_data='type4')]
+        [InlineKeyboardButton("Мне нужна помощь психолога", callback_data='psy')],
+        [InlineKeyboardButton("Мне нужна помощь юриста", callback_data='law')],
+        [InlineKeyboardButton("Мне нужен репетитор", callback_data='tut')],
+        [InlineKeyboardButton("Мне нужна работа", callback_data='work')]
     ]
     return InlineKeyboardMarkup(keyboard)
 
 # Handler to start the conversation and send the request type options
 async def send_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="Choose type of request", reply_markup=build_request_buttons())
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="Как ты думаешь, кто тебе может помочь?", reply_markup=build_request_buttons())
     return REQUEST_TYPE
 
 # Handler to process the button press and ask for the problem description
@@ -107,19 +107,19 @@ async def button_pressed(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     query = update.callback_query
     await query.answer()
     context.user_data['request_type'] = query.data  # Store the selected request type
-    await query.edit_message_text(text="Please write your problem.")
+    await query.edit_message_text(text="Опиши свою проблему")
     return SUBMIT_PROBLEM
 
 # Handler to capture the problem description from the user
 async def submit_problem(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     problem = update.message.text
     context.user_data['problem'] = problem
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=f"Type of Request: {context.user_data['request_type']}\nProblem: {problem}\nIs this correct? (yes/no)")
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=f"Тип запроса: {context.user_data['request_type']}\nПроблема: {problem}\nВсе верно? (да или /cancel)")
     return VERIFY_PROBLEM
 
 # Handler to verify and save the problem description
 async def verify_and_save_problem(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    verified = update.message.text.lower() == 'yes'
+    verified = update.message.text.lower() == 'да'
     if verified:
         user_id = update.message.from_user.id  # Get user ID from the message
         if user_id:
@@ -171,17 +171,18 @@ async def verify_and_save_problem(update: Update, context: ContextTypes.DEFAULT_
             #await send_message_to_chat("hello from the app ")
             # Save problem to the database (function to be implemented)
             # save_problem_to_database(user_id, context.user_data['problem'])  # TODO: Implement this function
-            await context.bot.send_message(chat_id=update.effective_chat.id, text="Your problem has been successfully saved.")
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="Мы сохранили ваш запрос. С вами свяжутся! Новый запрос можно отправить использовав команду /send_request")
         else:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text="User ID not found. Please try again.")
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="Я не распознал ваш ID :(.  Вы уверены что вы зарегестрировались?")
     else:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="I didn't understand you :(. Please verify the problem again. (yes/no)")
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="Я вас не понял :(. Пожалуйста попробуйте еще раз. (да или /cancel)")
     return ConversationHandler.END  # End the conversation
 
+# this is a dublicate, dont need this
 # Handler to cancel the request
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.message.reply_text('Request cancelled.')
-    return ConversationHandler.END
+# async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+#     await update.message.reply_text('Запрос был отменет. Если хотите попробовать еще раз нажмите /send_request.')
+#     return ConversationHandler.END
 
 
 
@@ -191,14 +192,12 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def help_command(update, context):
     """Send a message when the command /help is issued."""
     await update.message.reply_text('''
-Hello I am your friendly bot. Here's how you can use me:
-/start - Start chatting with the bot, set up profile
-/set_profile - Set up profile, usually chage info, but not ID
-/send_request - choose type of request and share problem
-/report_error - let developers know what goes wrong
-/cancel - at any point you can cancel whatever you are doing
-and start over with a new command                                   
-/help - Get help on how to use me.
+Привет, я бот для отправки запросов волонтерам. Я распознаю следующие команды:
+/start - Начать общаться, регистрация
+/send_request - Отправить запрос
+/report_error - Сообщить об ошибке бота
+/cancel - Отменить запрос                                   
+/help - Посмотреть доступные команды
 ''')
     
 
@@ -207,14 +206,14 @@ REPORT_PROBLEM = range(1)
 
 # Function to handle the /report_error command
 async def report_error(update: Update, context: CallbackContext):
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="What is the problem?")
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="Сообщи о проблеме")
     return REPORT_PROBLEM
 
 # Function to handle the user's response
 async def handle_problem(update: Update, context: CallbackContext):
     problem = update.message.text
     # Process the problem or save it to a database
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="Thank you for reporting the problem.")
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="Спасибо, я направил сообщение админу.")
     return ConversationHandler.END
 
 
@@ -228,39 +227,39 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     global my_chat_id,TARGET_CHAT_ID
     my_chat_id = update.message.chat_id
     TARGET_CHAT_ID = my_chat_id
-    await update.message.reply_text(f'Your chat ID is: {my_chat_id}')
-    #await update.message.reply_text('Welcome! Let\'s register you. What\'s your name?')
+    #await update.message.reply_text(f'Your chat ID is: {my_chat_id}')
+    await update.message.reply_text('Welcome! Let\'s register you. What\'s your name?')
     return NAME
 
 # Collect name and ask for age
 async def name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['user_id'] = update.message.from_user.id
     context.user_data['name'] = update.message.text
-    await update.message.reply_text('How old are you?')
+    await update.message.reply_text('Сколько тебе лет?')
     return AGE
 
 # Collect age and ask for region
 async def age(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['age'] = update.message.text
-    await update.message.reply_text('Which region are you from?')
+    await update.message.reply_text('Из какого ты региона России?')
     return REGION
 
 # Collect region and ask for orphanage
 async def region(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['region'] = update.message.text
-    await update.message.reply_text('What is the name of your orphanage?')
+    await update.message.reply_text('Ты из интерната или деткого дома?')
     return ORPHANAGE
 
 # Collect orphanage and ask if they are alumni
 async def orphanage(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['orphanage'] = update.message.text
-    await update.message.reply_text('Are you an alumni? (yes/no)')
+    await update.message.reply_text('Являешься ли ты выпускником интерната или деткого дома? (да/нет)')
     return ALUMNI
 
 # Collect alumni status and ask for problem
 async def alumni(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data['alumni'] = update.message.text.lower() in ['yes', 'y']
-    await update.message.reply_text('What problem do you want to address?')
+    context.user_data['alumni'] = update.message.text.lower() in ['да', 'д']
+    await update.message.reply_text('Расскажи о своей проблеме')
     return PROBLEM
 
 # Collect problem and finish the conversation
@@ -302,24 +301,24 @@ async def problem(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         db.session.commit()
 
     await update.message.reply_text(
-        f'Thank you for registering!\n'
-        f'Name: {user_data["name"]}\n'
-        f'Age: {user_data["age"]}\n'
-        f'Region: {user_data["region"]}\n'
-        f'Orphanage: {user_data["orphanage"]}\n'
-        f'Alumni: {"Yes" if user_data["alumni"] else "No"}\n'
-        f'Problem: {user_data["problem"]}'
+        f'Спасибо за регистрацию!\n'
+        f'Имя: {user_data["name"]}\n'
+        f'Возраст: {user_data["age"]}\n'
+        f'Регион: {user_data["region"]}\n'
+        f'Интернат или детский дом: {user_data["orphanage"]}\n'
+        f'Выпускник или нет: {"Да" if user_data["alumni"] else "Нет"}\n'
+        f'Запрос: {user_data["problem"]}'
     )
 
     # Retrieve and send the event data
     #event_data_message = get_event_data()
-    await send_message_to_chat("hello from the app ")
+    #await send_message_to_chat("hello from the app ")
 
     return ConversationHandler.END
 
 # Command to cancel the conversation
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.message.reply_text('Action cancelled. You can start over by sending the command once again or use /help to se menu')
+    await update.message.reply_text('Запрос отменен. Используйте команду /help чтобы увидеть доступные команды')
     return ConversationHandler.END
 
 def main():
